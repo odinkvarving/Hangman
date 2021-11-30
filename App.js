@@ -1,9 +1,6 @@
 import React, { Component, useState } from 'react';
-import { createBottomTabNavigator, createAppContainer, getActiveChildNavigationOptions} from 'react-navigation';  
-import Icon from 'react-native-vector-icons/Ionicons';  
 import { RadioButton } from 'react-native-paper';
 import AlphabetButtons from './components/AlphabetButtons';
-import { NavigationEvents } from 'react-navigation';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { 
@@ -12,22 +9,33 @@ import {
   View, 
   FlatList,
   Dimensions,
-  StatusBar,
   Alert, 
   Button,
   } from 'react-native';
-import { createMaterialBottomTabNavigator } from 'react-navigation-material-bottom-tabs';
 
-var SELECTED_LANGUAGE = 0
+var SELECTED_LANGUAGE
 var COUNTER = 0
 var FIRST_RENDER = true
+var COLOR = ""
+var gjetteTekst = "Gjett ordet: "
+var guessText = "Guess the word: "
+var textBox = ""
+var chooseLangText = "Select your preferred language: "
+var velgSpråkTekst = "Velg ditt foretrukne språk: "
+var langBox = "Velg ditt foretrukne språk: "
 
 function changeInfo() {
   if(SELECTED_LANGUAGE === 0) {
+    langBox = velgSpråkTekst
     return norwegianInfo()
   }
   else if(SELECTED_LANGUAGE == 1) {
+    langBox = chooseLangText
     return englishInfo()
+  }
+  else {
+    langBox = velgSpråkTekst
+    return norwegianInfo()
   }
 }
 
@@ -40,7 +48,9 @@ Hvis spilleren som gjetter foreslår en bokstav som finnes i ordet, skriver den 
 
 Hvis bokstaven som foreslås ikke er med i ordet, tegner den andre spilleren ett av elementene i Hangman-diagrammet. 
 Spillet er over når: spilleren som gjetter har løst hele ordet 
-eller den andre spilleren fullfører diagrammet
+eller den andre spilleren fullfører diagrammet. 
+
+For å starte et nytt spill - trykk på nullstill-knappen når du har enten vunnet eller tapt.
 `
 }
 
@@ -53,7 +63,9 @@ If the player that is guessing suggests a letter that exists in the word, the ot
   
 If the letter that is suggested is not part of the word, the other player draws one of the elements in the Hangman-diagram.
 The game is over when: the player that is guessing has solved the entire word
-or the other player finishes the diagram
+or the other player finishes the diagram. 
+
+To start a new game - press the reset-button when have either lost or won. 
 `
 }
 
@@ -70,10 +82,21 @@ const data = [
 ]
 
 const words = ["POTATO", "BICYCLE", "SOUP", "COMPUTER", "ENGINEER", "ABSTRACT"]
+const ord = ["POTET", "SYKKEL", "SUPPE", "DATAMASKIN", "INGENIØR", "ABSTRAKT"]
 
 function generateWord() {
-  wordIndex = Math.floor(Math.random() * (words.length))
-  return words[wordIndex]
+  if(SELECTED_LANGUAGE == 0) {
+    wordIndex = Math.floor(Math.random() * (ord.length))
+    return ord[wordIndex]
+  }
+  else if (SELECTED_LANGUAGE == 1) {
+    wordIndex = Math.floor(Math.random() * (words.length))
+    return words[wordIndex]
+  }
+  else {
+    wordIndex = Math.floor(Math.random() * (ord.length))
+    return ord[wordIndex]
+  }
 }
 
 function firstWrong() {
@@ -137,6 +160,9 @@ class HomeScreen extends React.Component {
       word: "",
       wordPlaceholder: [],
       button: "",
+      color: "",
+      gameOver: false,
+      finishedResetting: false,
     }
   }
 
@@ -162,6 +188,7 @@ class HomeScreen extends React.Component {
       e.value = ""
     })
     COUNTER = 0
+    this.setState({ gameOver: false})
   }
 
   checkIfCorrect() {
@@ -186,18 +213,26 @@ class HomeScreen extends React.Component {
   }
 
   checkIfWon() {
-    if(!this.state.wordPlaceholder.includes(" __ ")) {
-      Alert.alert("CONGRATULATIONS!", "Congratulations! You have guessed the entire word correctly!")
-      this.componentDidMount()
+    if(!this.state.wordPlaceholder.includes(" __ ") && this.state.language == 0) {
+      this.setState({ gameOver: true})
+      Alert.alert("GRATULERER", "Gratulerer! Du har gjettet hele ordet riktig! \n\n Trykk på NULLSTILL for å prøve igjen!")
+    }
+    else if(!this.state.wordPlaceholder.includes(" __ ") && this.state.language == 1) {
+      this.setState({ gameOver: true})
+      Alert.alert("CONGRATULATIONS!", "Congratulations! You have guessed the entire word correctly! \n\n Click on RESET to try again!")
     }
   }
 
   changeAndRender = () => {
     if(this.checkIfCorrect() == true) {
+      this.checkLetter()
+      this.sendLetter()
       console.log("\nCORRECT! This letter was part of the word.")
       this.checkIfWon()
     }
     else {
+      this.checkLetter()
+      this.sendLetter()
       console.log("\nWRONG! This letter was not part of the word.")
       if(COUNTER == 0) {
         firstWrong()
@@ -247,39 +282,78 @@ class HomeScreen extends React.Component {
       else if(COUNTER == 9) {
         tenthWrong()
         this.setState({ data: Math.random})
-        Alert.alert("HANGED!", "Unfortunately, you have not been able to guess the word! GAME OVER.")
-        this.componentDidMount()
-      }
+        this.setState({ gameOver: true})
+        if(this.state.language == 0) {
+          Alert.alert("HENGT!", "Desverre, du har ikke klart å gjette det riktige ordet! GAME OVER! \n\nTrykk på nullstill for å prøve igjen")
+        }
+        else {
+          Alert.alert("HANGED!", "Unfortunately, you have not been able to guess the word! GAME OVER! \n\nClick reset to try again")
+        }
+        COUNTER += 1
+      }    
     }
   }
 
   changeLanguage = (e) => {
-    if(SELECTED_LANGUAGE == 0) {
+    if(SELECTED_LANGUAGE == 0 && FIRST_RENDER == false) {
       this.setState({ language: 0})
-      if(FIRST_RENDER = false) {
-        Alert.alert(
-          "Språkbytte detektert",
-          "Språket har blitt endret under spillet. Bokstavene er endret til det norske tastaturet, men du kan fortsatt spille videre."
-        )
-      }
+      Alert.alert(
+        "Språkbytte detektert",
+        "Språket har blitt endret underveis i spillet. Du spiller nå med norske ord istedenfor engelske. Lykke til!"
+      )
+      textBox = gjetteTekst 
     }
-    else if(SELECTED_LANGUAGE == 1) {
+    else if(SELECTED_LANGUAGE == 0 && FIRST_RENDER == true) {
+      this.setState({ language: 0})
+      FIRST_RENDER = false
+      textBox = gjetteTekst
+    } 
+    else if(SELECTED_LANGUAGE == 1 && FIRST_RENDER == false) {
       this.setState({ language: 1})
-      if(FIRST_RENDER = false) {
-        Alert.alert(
-          "Change of language detected",
-          "The language was changed while playing. The letters are changed to the english keyboard, but you can still keep playing."
-        )
-      }
+      textBox = guessText
+    }
+    else if(SELECTED_LANGUAGE == 1 && FIRST_RENDER == true) {
+      this.setState({ language: 1})
+      Alert.alert(
+        "Change of language detected",
+        "The language was changed while playing. You are now playing with english words instead of norwegian. Good luck!"
+      )
+      FIRST_RENDER = false
+      textBox = guessText
+    }
+    else {
+      textBox = gjetteTekst
     }
   }
 
   handleCallback = (buttonData) => {
       this.setState({ button: buttonData }, () => {this.changeAndRender()})
   }
+
+  checkLetter = () => {
+    let button = this.state.button
+    let placeholder = this.state.wordPlaceholder
+    if(placeholder.includes(button)) {
+      this.setState({ color: "green"})
+    }
+    else {
+      this.setState({ color: "red"})
+    } 
+  }
+
+  sendLetter = () => {
+    let button = this.state.button
+    this.setState({ button: button})
+  }
+
+  endGame = () => {
+    this.setState({ finishedResetting: true}, () => { this.componentDidMount()})
+  }
   
   render() {
-
+    const {color} = this.state
+    const {button} = this.state
+    const {gameOver} = this.state
     return (
       <View style={{
       }}>
@@ -300,17 +374,22 @@ class HomeScreen extends React.Component {
           height: 80
         }}>
           <Text style={{
-          }}>Guess the word: </Text>
+            paddingTop: 5,
+            paddingBottom: 20
+          }}>{textBox}</Text>
           <Text title={this.state.word}>{this.state.wordPlaceholder}</Text>
         </View>
         <View style={{
           height: 250
         }}>
         <AlphabetButtons
-          //whenClicked={this.changeAndRender}
           language={this.state.language}
           extraData={this.state}
           parentCallback = {this.handleCallback}
+          colorAfterClick = {color}
+          buttonClicked = {button}
+          gameOver = {gameOver}
+          endTheGame = {this.endGame}
         ></AlphabetButtons>
         </View>
       </View>
@@ -327,12 +406,14 @@ class SettingsScreen extends React.Component {
     this.setState({ checked: 'Norsk'})
     SELECTED_LANGUAGE = 0
     console.log("Norwegian was selected as language")
+    langBox = velgSpråkTekst
   }
 
   selectedEnglish() {
     this.setState({ checked: 'English'})
     SELECTED_LANGUAGE = 1
     console.log("English was selected as language")
+    langBox = chooseLangText
   }
 
   selectedSystem() {
@@ -350,7 +431,7 @@ class SettingsScreen extends React.Component {
           alignItems: "center",
           height: 50
           }}>
-          <Text>Select preferred lagnuage: </Text>
+          <Text>{langBox}</Text>
         </View>
         <View 
           style={{
@@ -377,7 +458,7 @@ class SettingsScreen extends React.Component {
         <View style={{
           backgroundColor: "#fff",
           alignItems: "center",
-          height: 400,
+          height: 500,
           padding: 30
         }}>
           <Text>
@@ -391,12 +472,14 @@ class SettingsScreen extends React.Component {
 
 function settingsScreen({ navigation }) {
   return (
-    <View>
+    <View style={{
+      flex: 1
+    }}>
       <SettingsScreen></SettingsScreen>
       <Button 
-        title="test"
+        title="START"
         onPress={() => {
-          navigation.navigate("home")
+          navigation.navigate("Hangman")
         }}
       ></Button>
     </View>
@@ -412,41 +495,14 @@ function homeScreen({ navigation }) {
   )
 }
 
-const TabNavigator = createMaterialBottomTabNavigator(
-  {
-    Home: {screen: HomeScreen, 
-      navigationOptions: {
-        tabBarLabel: 'Home',
-        tabBarIcon: ({tintColor}) => (
-          <View>
-            <Icon style={[{color:tintColor}]} size={25} name={"ios-home"}/>
-          </View>
-        )
-      }
-    },
-
-    Settings: { screen: SettingsScreen,
-      navigationOptions: {
-        tabBarLabel: "Settings",
-        tabBarIcon: ({tintColor}) => (
-          <View>
-            <Icon style={[{color:tintColor}]} size={25} name={"ios-settings"}/>
-          </View>
-        )
-      }
-    }
-  }
-)
-
 const Stack = createNativeStackNavigator()
-
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="settings">
-        <Stack.Screen name="settings" component={settingsScreen}/>
-        <Stack.Screen name="home" component={homeScreen}/>
+      <Stack.Navigator initialRouteName="Instillinger">
+        <Stack.Screen name="Instillinger" component={settingsScreen}/>
+        <Stack.Screen name="Hangman" component={homeScreen}/>
       </Stack.Navigator>
     </NavigationContainer>
 
@@ -467,7 +523,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flex: 1,
     height: (Dimensions.get('window').width / numColumns) * 0.8,
-    backgroundColor: "lightgrey"
+    backgroundColor: "#fffaf0"
   },
   itemText: {
     color: 'black',
